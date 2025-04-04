@@ -118,15 +118,20 @@ function processPayload() {
 }
 
 
-function handleDirectorySelected(event, path) {
-    state.downloadPath = path;
+function handleDirectorySelected(event, selectedPath) {
+    // Create the full download path by combining selected directory and zip_file_name
+    state.downloadPath = path.join(selectedPath, state.zip_file_name);
+    
     state.isDownloading = true;
     state.isCancelled = false;
     state.isPaused = false;
 
-    log(`Download directory: ${path}`, 'info');
+    log(`Download directory: ${state.downloadPath}`, 'info');
     updateButtonStates();
-    ipcRenderer.send('process-payload', state.currentPayload, path);
+    
+    // First create the parent folder, then process the payload
+    ipcRenderer.send('create-parent-folder', state.downloadPath);
+    ipcRenderer.send('process-payload', state.currentPayload, state.downloadPath);
 }
 
 // Download Control Functions

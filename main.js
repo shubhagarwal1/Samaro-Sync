@@ -72,8 +72,9 @@ async function processPayloadWithResume(event, payload, basePath) {
                     });
                 }
 
-                const folderPath = item.foldername ? path.join(basePath, item.foldername.trim()) : basePath;
-                console.log(`Creating folder: ${folderPath}`);
+                // Create subfolder path based on foldername
+                const folderPath = path.join(basePath, item.foldername.trim());
+                console.log(`Creating subfolder: ${folderPath}`);
 
                 if (!fs.existsSync(folderPath)) {
                     fs.mkdirSync(folderPath, { recursive: true });
@@ -84,12 +85,12 @@ async function processPayloadWithResume(event, payload, basePath) {
                 if (fs.existsSync(filePath)) {
                     const stats = await fs.promises.stat(filePath);
                     if (stats.size > 0) {
-                        // File already exists and has a size > 0, consider it complete
+                        // File exists and has content, skip
                         event.reply('file-download-complete', {
                             filePath: path.relative(basePath, filePath),
                             size: stats.size
                         });
-                        continue; // Skip this file since it's already downloaded
+                        continue;
                     }
                 }
 
@@ -98,7 +99,7 @@ async function processPayloadWithResume(event, payload, basePath) {
             } catch (error) {
                 if (error.message !== 'Download cancelled') {
                     event.reply('processing-error', `Failed to process ${item.filename}: ${error.message}`);
-                    throw error; // Re-throw to trigger the catch block below
+                    throw error;
                 }
             }
         }
@@ -254,6 +255,12 @@ ipcMain.on('create-parent-folder', (event, parentFolderPath) => {
 ipcMain.on('process-payload', async (event, payload, basePath) => {
     try {
         console.log(`Base path for downloading files: ${basePath}`);
+        
+        // Ensure the parent folder exists
+        if (!fs.existsSync(basePath)) {
+            fs.mkdirSync(basePath, { recursive: true });
+            console.log(`Parent folder created at: ${basePath}`);
+        }
         
         // Now, process each file inside the parent folder
         await processPayloadWithResume(event, payload, basePath);
