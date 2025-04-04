@@ -1,0 +1,111 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Payload Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <div class="container mx-auto px-4 py-8 flex-grow">
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">URL Payload Processor</h1>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Processing Section -->
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Fetch Payload</h2>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2">Enter Payload URL</label>
+                        <input type="text" id="payloadUrlInput"
+                            placeholder="http://127.0.0.1:9600/pybackend/public/download-ready/?reqId=1"
+                            class="w-full p-2 border rounded bg-white text-gray-700">
+                    </div>
+
+                    <button id="fetchPayloadBtn"
+                        class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition duration-300">
+                        Fetch Payload
+                    </button>
+
+                    <button id="processPayloadBtn"
+                        class="w-full mt-2 bg-green-500 text-white py-2 rounded hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                        Process Payload
+                    </button>
+
+                    <div class="flex space-x-2 mt-2">
+                        <button id="pauseBtn"
+                            class="flex-1 bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
+                            Pause
+                        </button>
+                        <button id="resumeBtn"
+                            class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
+                            Resume
+                        </button>
+                        <button id="cancelBtn"
+                            class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
+                            Cancel
+                        </button>
+                    </div>
+
+                    <div id="processingLog"
+                        class="mt-4 p-3 bg-white border rounded h-48 overflow-y-auto custom-scrollbar text-sm">
+                        <p class="text-gray-500">Processing logs will appear here...</p>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Download Results</h2>
+
+                    <div id="directoryTree"
+                        class="p-3 bg-white border rounded h-64 overflow-y-auto custom-scrollbar font-mono text-sm">
+                        <p class="text-gray-500">Directory structure will be displayed here...</p>
+                    </div>
+
+                    <div class="mt-4">
+                        <div id="summaryStats" class="bg-blue-50 p-3 rounded border border-blue-200 text-sm">
+                            <p class="text-gray-700">Total Files: <span id="totalFiles">0</span></p>
+                            <p class="text-gray-700">Total Size: <span id="totalSize">0 MB</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white py-4 text-center text-gray-600 text-sm">
+        © 2024 URL Payload Processor
+    </footer>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
