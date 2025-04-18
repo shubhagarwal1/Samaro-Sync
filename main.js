@@ -1,270 +1,142 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const dirTree = require('directory-tree');
+const { app, dialog } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const log = require("electron-log");
+const { autoUpdater } = require("electron-updater");
 
-let mainWindow;
-let activeDownloads = new Map();  // Declare activeDownloads to track ongoing downloads
-let isPaused = false;
+// Configure logging
+log.transports.file.level = "info";
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        }
-    });
-    mainWindow.webContents.openDevTools();
-    mainWindow.loadFile('index.html');
+// Configure auto-updater
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = "info";
+log.info("Application starting...");
+log.info(`App version: ${app.getVersion()}`);
+log.info(`App name: ${app.getName()}`);
+log.info(`App path: ${app.getAppPath()}`);
+log.info(`Executable path: ${process.execPath}`);
+log.info(`Working directory: ${process.cwd()}`);
+log.info(`Platform: ${process.platform}`);
+log.info(`Process args: ${process.argv.join(" ")}`);
+
+// Set app name explicitly
+app.setName("Samaro Sync");
+
+// Handle Windows-specific setup
+if (process.platform === "win32") {
+  // Fix path resolution issues on Windows
+  try {
+    const appPath = app.getAppPath();
+    const execPath = path.dirname(process.execPath);
+    log.info(`Windows app path: ${appPath}`);
+    log.info(`Windows executable directory: ${execPath}`);
+
+    // Add our paths to process.env.PATH to ensure Windows can find dependencies
+    process.env.PATH = `${execPath};${appPath};${process.env.PATH}`;
+
+    // Check if executable exists
+    if (fs.existsSync(process.execPath)) {
+      log.info(`Executable file exists at ${process.execPath}`);
+    } else {
+      log.error(`Executable not found at ${process.execPath}`);
+    }
+  } catch (error) {
+    log.error(`Error setting up Windows paths: ${error.message}`);
+  }
+
+  // Handle squirrel events (Windows)
+  try {
+    // Import Windows-specific setup module
+    const isSquirrelStartup = require("./js/main/squirrel-startup");
+    if (isSquirrelStartup) {
+      log.info("Exiting due to Squirrel startup event");
+      app.quit();
+      process.exit(0);
+    }
+  } catch (error) {
+    log.error(`Error handling Squirrel events: ${error.message}`);
+  }
 }
 
-app.whenReady().then(createWindow);
+// Setup error handler
+process.on("uncaughtException", (error) => {
+  log.error(`Uncaught exception: ${error.message}`);
+  log.error(error.stack);
 
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      "Application Error",
+      `An unexpected error occurred:\n${error.message}\n\nCheck the logs for more details.`
+    );
+  }
 });
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+// Setup auto-updater events
+autoUpdater.on('checking-for-update', () => {
+  log.info('Checking for updates...');
 });
 
-// Directory Selection
-ipcMain.on('select-download-directory', (event) => {
-    dialog.showOpenDialog({
-        properties: ['openDirectory', 'createDirectory']
-    }).then(result => {
-        if (!result.canceled) {
-            event.reply('selected-directory', result.filePaths[0]);
-        }
-    }).catch(err => {
-        event.reply('processing-error', `Directory selection failed: ${err.message}`);
-    });
-});
-
-// Payload Processing
-// ipcMain.on('process-payload', async (event, payload, basePath) => {
-//     try {
-//         if (!fs.existsSync(basePath)) {
-//             fs.mkdirSync(basePath, { recursive: true });
-//         }
-//         await processPayloadWithResume(event, payload, basePath);
-//     } catch (error) {
-//         event.reply('processing-error', `Processing failed: ${error.message}`);
-//     }
-// });
-
-// Modify the processPayloadWithResume function
-async function processPayloadWithResume(event, payload, basePath) {
-    try {
-        for (const item of payload) {
-            try {
-                if (isPaused) {
-                    await new Promise(resolve => {
-                        const interval = setInterval(() => {
-                            if (!isPaused) {
-                                clearInterval(interval);
-                                resolve();
-                            }
-                        }, 500);
-                    });
-                }
-
-                // Create subfolder path based on foldername
-                const folderPath = path.join(basePath, item.foldername.trim());
-                console.log(`Creating subfolder: ${folderPath}`);
-
-                if (!fs.existsSync(folderPath)) {
-                    fs.mkdirSync(folderPath, { recursive: true });
-                }
-
-                const filePath = path.join(folderPath, item.filename);
-                
-                if (fs.existsSync(filePath)) {
-                    const stats = await fs.promises.stat(filePath);
-                    if (stats.size > 0) {
-                        // File exists and has content, skip
-                        event.reply('file-download-complete', {
-                            filePath: path.relative(basePath, filePath),
-                            size: stats.size
-                        });
-                        continue;
-                    }
-                }
-
-                await downloadFileWithPause(item.url, filePath, event);
-                
-            } catch (error) {
-                if (error.message !== 'Download cancelled') {
-                    event.reply('processing-error', `Failed to process ${item.filename}: ${error.message}`);
-                    throw error;
-                }
-            }
-        }
-
-        if (!isPaused) {
-            const tree = generateDirectoryTree(basePath);
-            event.reply('display-directory-tree', tree);
-            event.reply('downloads-complete');
-        }
-    } catch (error) {
-        event.reply('processing-error', `Processing failed: ${error.message}`);
-        throw error;
+autoUpdater.on('update-available', (info) => {
+  log.info('Update available:', info);
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update Available',
+    message: 'A new version is available. Would you like to download and install it now?',
+    buttons: ['Yes', 'No'],
+    defaultId: 0
+  }).then(({ response }) => {
+    if (response === 0) {
+      autoUpdater.downloadUpdate();
     }
+  });
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  log.info('Update not available:', info);
+});
+
+autoUpdater.on('error', (err) => {
+  log.error('Error in auto-updater:', err);
+  dialog.showErrorBox('Error', 'Failed to check for updates. Please try again later.');
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let message = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
+  log.info(message);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  log.info('Update downloaded:', info);
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update Ready',
+    message: 'Update has been downloaded. The application will restart to install the update.',
+    buttons: ['Restart'],
+    defaultId: 0
+  }).then(() => {
+    autoUpdater.quitAndInstall(false, true);
+  });
+});
+
+// Initialize the application
+try {
+  const { initializeApp } = require("./js/main");
+  initializeApp();
+  
+  // Check for updates after app is initialized
+  autoUpdater.checkForUpdates().catch(err => {
+    log.error('Error checking for updates:', err);
+  });
+  
+  // Check for updates every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(err => {
+      log.error('Error checking for updates:', err);
+    });
+  }, 60 * 60 * 1000);
+  
+} catch (error) {
+  log.error(`Failed to initialize application: ${error.message}`);
+  log.error(error.stack);
+  app.quit();
 }
-
-// Helper function for file download
-async function downloadFileWithPause(url, filePath, event) {
-    const downloadId = `${url}-${Date.now()}`;
-    
-    try {
-        const response = await axios({
-            method: 'get',
-            url,
-            responseType: 'stream',
-            timeout: 30000
-        });
-
-        const totalSize = parseInt(response.headers['content-length'], 10) || 0;
-        let downloadedSize = 0;
-
-        // Check for existing partial download
-        let startFrom = 0;
-        if (fs.existsSync(filePath)) {
-            const stats = await fs.promises.stat(filePath);
-            startFrom = stats.size;
-            if (startFrom > 0) {
-                response.data.destroy(); // Close the previous stream
-                return downloadFileWithPause(url, filePath, event); // Retry with resume headers
-            }
-        }
-
-        const writer = fs.createWriteStream(filePath, {
-            flags: startFrom > 0 ? 'r+' : 'w'
-        });
-
-        // Store active download for pause/resume
-        activeDownloads.set(downloadId, { response, writer });
-
-        response.data.on('data', (chunk) => {
-            if (isPaused) {
-                response.data.pause();
-                return;
-            }
-            
-            downloadedSize += chunk.length;
-            const progress = totalSize > 0 ? Math.round((downloadedSize / totalSize) * 100) : 0;
-            event.reply('download-progress', {
-                filePath: path.relative(path.dirname(filePath), filePath),
-                progress,
-                downloadedSize,
-                totalSize
-            });
-        });
-
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-            response.data.on('error', reject);
-        });
-
-    } finally {
-        activeDownloads.delete(downloadId);
-    }
-}
-
-// Generate directory tree
-function generateDirectoryTree(rootPath) {
-    const tree = dirTree(rootPath, {
-        normalizePath: true,
-        exclude: /node_modules|\.git/
-    });
-
-    function formatTree(node, depth = 0, isLast = false) {
-        const indent = ' '.repeat(depth * 4);
-        let result = `${indent}${depth > 0 ? (isLast ? '└── ' : '├── ') : ''}${node.name}\n`;
-        
-        if (node.children) {
-            node.children.forEach((child, i) => {
-                result += formatTree(child, depth + 1, i === node.children.length - 1);
-            });
-        }
-        return result;
-    }
-
-    return formatTree(tree);
-}
-
-// ipc fucntions
-ipcMain.on('pause-downloads', () => {
-    isPaused = true;
-    activeDownloads.forEach(download => {
-        if (download.response && download.response.data) {
-            download.response.data.pause(); // Pause the download stream
-        }
-    });
-});
-
-ipcMain.on('resume-downloads', (event, payload, basePath) => {
-    isPaused = false;
-    activeDownloads.forEach(download => {
-        if (download.response && download.response.data) {
-            download.response.data.resume(); // Resume the download stream
-        }
-    });
-    processPayloadWithResume(event, payload, basePath);
-});
-
-ipcMain.on('cancel-downloads', () => {
-    isPaused = false;
-    activeDownloads.forEach(download => {
-        if (download.response && download.response.data) {
-            download.response.data.destroy(); // Cancel the download
-        }
-        if (download.writer) {
-            download.writer.end(); // Close the file writer
-        }
-    });
-    activeDownloads.clear();
-});
-
-
-// Create the parent folder first
-ipcMain.on('create-parent-folder', (event, parentFolderPath) => {
-    try {
-        console.log(`Creating parent folder at: ${parentFolderPath}`); // Debugging
-        
-        // Ensure the parent folder exists
-        if (!fs.existsSync(parentFolderPath)) {
-            fs.mkdirSync(parentFolderPath, { recursive: true });
-            console.log(`Parent folder created at: ${parentFolderPath}`);
-        }
-
-        // Now, proceed with the payload processing
-        event.reply('parent-folder-created', parentFolderPath);
-    } catch (error) {
-        event.reply('processing-error', `Failed to create parent folder: ${error.message}`);
-    }
-});
-
-// Process the payload after the parent folder is created
-ipcMain.on('process-payload', async (event, payload, basePath) => {
-    try {
-        console.log(`Base path for downloading files: ${basePath}`);
-        
-        // Ensure the parent folder exists
-        if (!fs.existsSync(basePath)) {
-            fs.mkdirSync(basePath, { recursive: true });
-            console.log(`Parent folder created at: ${basePath}`);
-        }
-        
-        // Now, process each file inside the parent folder
-        await processPayloadWithResume(event, payload, basePath);
-    } catch (error) {
-        event.reply('processing-error', `Processing failed: ${error.message}`);
-    }
-});

@@ -1,0 +1,112 @@
+mkdir -p assets
+put the icon jpg file in this 
+mkdir -p build
+mkdir -p icon.iconset
+
+Generate different size icons using sips (built into macOS):
+sips -z 16 16 assets/logo.jpg --out icon.iconset/icon_16x16.png && sips -z 32 32 assets/logo.jpg --out icon.iconset/icon_16x16@2x.png && sips -z 32 32 assets/logo.jpg --out icon.iconset/icon_32x32.png && sips -z 64 64 assets/logo.jpg --out icon.iconset/icon_32x32@2x.png && sips -z 128 128 assets/logo.jpg --out icon.iconset/icon_128x128.png && sips -z 256 256 assets/logo.jpg --out icon.iconset/icon_128x128@2x.png && sips -z 256 256 assets/logo.jpg --out icon.iconset/icon_256x256.png && sips -z 512 512 assets/logo.jpg --out icon.iconset/icon_256x256@2x.png && sips -z 512 512 assets/logo.jpg --out icon.iconset/icon_512x512.png && sips -z 1024 1024 assets/logo.jpg --out icon.iconset/icon_512x512@2x.png
+
+Create the .icns file using iconutil:
+iconutil -c icns icon.iconset -o build/icon.icns
+
+We need to convert to PNG format first, as the iconutil tool doesn't work well with JPG:
+sips -s format png assets/logo.jpg --out build/temp_logo.png
+
+
+Let's recreate the iconset with this PNG:
+rm -rf icon.iconset && mkdir -p icon.iconset && sips -z 16 16 build/temp_logo.png --out icon.iconset/icon_16x16.png && sips -z 32 32 build/temp_logo.png --out icon.iconset/icon_16x16@2x.png && sips -z 32 32 build/temp_logo.png --out icon.iconset/icon_32x32.png && sips -z 64 64 build/temp_logo.png --out icon.iconset/icon_32x32@2x.png && sips -z 128 128 build/temp_logo.png --out icon.iconset/icon_128x128.png && sips -z 256 256 build/temp_logo.png --out icon.iconset/icon_128x128@2x.png && sips -z 256 256 build/temp_logo.png --out icon.iconset/icon_256x256.png && sips -z 512 512 build/temp_logo.png --out icon.iconset/icon_256x256@2x.png && sips -z 512 512 build/temp_logo.png --out icon.iconset/icon_512x512.png && sips -z 1024 1024 build/temp_logo.png --out icon.iconset/icon_512x512@2x.png
+
+
+
+iconutil -c icns icon.iconset -o build/icon.icns
+which convert
+convert build/temp_logo.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+
+Update package.json to use both icons
+{
+  "name": "samaro-sync",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron . --enable-logging",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:dev": "cross-env NODE_ENV=development electron-builder -c.extraMetadata.environment=development",
+    "build:uat": "cross-env NODE_ENV=uat electron-builder -c.extraMetadata.environment=uat",
+    "build:prod": "cross-env NODE_ENV=production electron-builder -c.extraMetadata.environment=production",
+    "build:mac:dev": "npm run build:dev -- --mac",
+    "build:mac:uat": "npm run build:uat -- --mac",
+    "build:mac:prod": "npm run build:prod -- --mac",
+    "build:win:dev": "npm run build:dev -- --win",
+    "build:win:uat": "npm run build:uat -- --win",
+    "build:win:prod": "npm run build:prod -- --win"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^35.1.4",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "axios": "^1.8.4",
+    "directory-tree": "^3.5.2",
+    "electron-log": "^5.3.2"
+  },
+  "description": "",
+  "build": {
+    "appId": "com.samaro.sync",
+    "productName": "Samaro Sync",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
+  }
+}
+
+rm -rf icon.iconset
+
+final build
+npm run build:mac:dev
+npm run build:win:dev
+
+
+
+
+
+

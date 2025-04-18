@@ -5,9 +5,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL Payload Processor</title>
+    <title>PULLBOX</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
+        :root {
+            --samaro-primary: #871063;
+            --samaro-primary-light: #a71373;
+            --samaro-primary-dark: #670853;
+            --samaro-primary-bg: #fdf2f8;
+            --pullbox-purple: #871063;
+            --pullbox-purple-light: #a71373;
+            --pullbox-purple-dark: #670853;
+            --pullbox-bg: #fdf2f8;
+        }
+
         .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -26,86 +37,465 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        .hidden {
+            display: none;
+        }
+
+        .otp-input {
+            width: 40px;
+            height: 40px;
+            margin: 0 5px;
+            text-align: center;
+            font-size: 1.2rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .otp-input:focus {
+            border-color: var(--samaro-primary);
+            box-shadow: 0 0 0 3px rgba(135, 16, 99, 0.1);
+            outline: none;
+        }
+
+        .otp-input.error {
+            border-color: #ef4444;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            75% {
+                transform: translateX(5px);
+            }
+        }
+
+        #pauseBtn.active {
+            background-color: var(--samaro-primary-light);
+            color: white;
+            border-color: var(--samaro-primary);
+        }
+
+        #resumeBtn.active {
+            background-color: var(--samaro-primary-light);
+            color: white;
+            border-color: var(--samaro-primary);
+        }
+
+        #processingLog {
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        #processingLog p {
+            margin-bottom: 4px;
+        }
+
+        #newDownloadBtnContainer {
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        #newDownloadBtnContainer.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Toast notification styles */
+        #refreshWarningToast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #f44336;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+
+        #refreshWarningToast.show {
+            transform: translateX(0);
+        }
+
+        #refreshWarningToast .close-btn {
+            margin-left: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
     </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex flex-col">
-    <div class="container mx-auto px-4 py-8 flex-grow">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">URL Payload Processor</h1>
+<body class="bg-gray-50 flex flex-col min-h-screen">
+    <!-- Main App Header -->
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto py-4 px-4">
+            <h1 class="text-3xl font-bold text-center" style="color: var(--samaro-primary)">PULLBOX</h1>
+            <p class="text-gray-600 text-center">An app for hassle-free and fast downloads</p>
+        </div>
+    </header>
 
-            <div class="grid md:grid-cols-2 gap-6">
-                <!-- Processing Section -->
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Fetch Payload</h2>
+    <!-- Main Content Area -->
+    <main class="flex-grow relative">
+        <!-- OTP Screen -->
+        <div id="otpScreen"
+            class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+            <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md mx-4">
+                <div class="text-center mb-8">
+                    <h4 class="text-2xl font-bold text-gray-800 mb-2">Enter OTP to start downloading</h4>
+                    <p class="text-gray-600">The OTP is sent your phone/email in the download ready notification.</p>
+                </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2">Enter Payload URL</label>
-                        <input type="text" id="payloadUrlInput"
-                            placeholder="http://127.0.0.1:9600/pybackend/public/download-ready/?reqId=1"
-                            class="w-full p-2 border rounded bg-white text-gray-700">
+                <form id="otpForm" class="mb-6" onsubmit="event.preventDefault();">
+                    <div class="flex justify-center">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric"
+                            required />
                     </div>
+                </form>
 
-                    <button id="fetchPayloadBtn"
-                        class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition duration-300">
-                        Fetch Payload
-                    </button>
+                <div id="otpProcessingLog" class="text-center min-h-[24px] text-sm"></div>
+            </div>
+        </div>
 
-                    <button id="processPayloadBtn"
-                        class="w-full mt-2 bg-green-500 text-white py-2 rounded hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled>
-                        Process Payload
-                    </button>
-
-                    <div class="flex space-x-2 mt-2">
-                        <button id="pauseBtn"
-                            class="flex-1 bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled>
-                            Pause
-                        </button>
-                        <button id="resumeBtn"
-                            class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled>
-                            Resume
-                        </button>
-                        <button id="cancelBtn"
-                            class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled>
-                            Cancel
-                        </button>
-                    </div>
-
-                    <div id="processingLog"
-                        class="mt-4 p-3 bg-white border rounded h-48 overflow-y-auto custom-scrollbar text-sm">
-                        <p class="text-gray-500">Processing logs will appear here...</p>
+        <!-- Folder Selection Screen (Initially Hidden) -->
+        <div id="folderSelectionScreen"
+            class="hidden absolute inset-0 flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+            <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md mx-4 text-center">
+                <div class="bg-blue-50 rounded-lg p-8 mb-8">
+                    <div class="flex justify-center">
+                        <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                        </svg>
                     </div>
                 </div>
 
-                <!-- Results Section -->
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Download Results</h2>
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Select a location to save your download</h2>
+                    <p id="fileCountText" class="text-gray-600">This download includes 0 files</p>
+                </div>
 
-                    <div id="directoryTree"
-                        class="p-3 bg-white border rounded h-64 overflow-y-auto custom-scrollbar font-mono text-sm">
-                        <p class="text-gray-500">Directory structure will be displayed here...</p>
+                <button id="selectFolderBtn" style="color: white; background-color: var(--samaro-primary);"
+                    class="w-full text-white py-3 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-purple-900 transition duration-300">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    <span>Select Folder</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Download Screen (Initially Hidden) -->
+        <div id="downloadScreen" class="hidden h-full">
+            <div class="container mx-auto px-4 py-8">
+                <div class="bg-white shadow-md rounded-lg p-6 max-w-2xl mx-auto">
+                    <div class="text-center mb-6">
+                        <h2 id="downloadStatus" class="text-2xl font-semibold text-gray-800">Downloading media...</h2>
+                        <p id="downloadMessage" class="text-gray-600">Relax, your download is in progress</p>
+
+                        <!-- New Download Button (will be shown after completion) -->
+                        <div id="newDownloadBtnContainer" class="hidden mt-6 flex justify-center">
+                            <button id="newDownloadBtn"
+                                class="px-8 py-4 text-white rounded-lg hover:opacity-90 transition-colors duration-300 shadow-lg"
+                                style="background-color: var(--samaro-primary);">
+                                <div class="flex items-center justify-center">
+                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                    </svg>
+                                    <span>New Download</span>
+                                </div>
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="mt-4">
-                        <div id="summaryStats" class="bg-blue-50 p-3 rounded border border-blue-200 text-sm">
-                            <p class="text-gray-700">Total Files: <span id="totalFiles">0</span></p>
-                            <p class="text-gray-700">Total Size: <span id="totalSize">0 MB</span></p>
+                    <!-- Current File Progress -->
+                    <div class="mb-6">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span id="currentFile" class="text-gray-700">IMG_2487.webp (0.72 MB / 0.79 MB)</span>
+                            <span id="progressPercentage" class="text-gray-700">80%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="progressBar" class="h-2.5 rounded-full transition-all duration-300"
+                                style="width: 80%; background-color: var(--samaro-primary)"></div>
+                        </div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex justify-center space-x-4 mb-8">
+                        <button id="pauseBtn"
+                            class="flex items-center px-4 py-2 border rounded-md hover:bg-gray-50 transition focus:ring-2 focus:ring-purple-300 focus:outline-none">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6">
+                                </path>
+                            </svg>
+                            Pause
+                        </button>
+                        <button id="resumeBtn"
+                            class="flex items-center px-4 py-2 border rounded-md hover:bg-gray-50 transition focus:ring-2 focus:ring-purple-300 focus:outline-none">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                                </path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Resume
+                        </button>
+                    </div>
+
+                    <!-- Download Results -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-4">
+                        <h3 class="font-semibold mb-3 text-gray-800">Download Results</h3>
+                        <!-- Processing Log (shown during download) -->
+                        <div id="processingLog" class="max-h-32 overflow-y-auto custom-scrollbar">
+                            <div class="flex items-center text-gray-700 mb-2">
+                                <span class="inline-block mr-2">
+                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                        </path>
+                                    </svg>
+                                </span>
+                                Processing
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                <p>Starting download...</p>
+                            </div>
+                        </div>
+
+                        <!-- Directory Tree (shown after completion) -->
+                        <div id="directoryTree"
+                            class="max-h-48 overflow-y-auto custom-scrollbar font-mono text-sm hidden">
+                            <!-- Directory structure will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats -->
+                    <div class="text-sm text-gray-600 flex justify-between mb-6">
+                        <span>Total Files: <span id="totalFiles">7</span></span>
+                        <span>Total Size: <span id="totalSize">5.22 MB</span></span>
+                    </div>
+
+                    <!-- Hidden elements for functionality -->
+                    <div class="hidden">
+                        <button id="processPayloadBtn">Choose Download Location</button>
+                        <div id="completionMessage" class="hidden">
+                            <div class="flex items-center justify-center text-green-600">
+                                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span class="text-lg font-semibold">Download Complete</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
-    <footer class="bg-white py-4 text-center text-gray-600 text-sm">
-        © 2024 URL Payload Processor
+    <!-- Main App Footer -->
+    <footer class="bg-white shadow-sm py-3 mt-auto">
+        <div class="container mx-auto text-center text-gray-500 text-sm">
+            &copy; 2023 PULLBOX. All rights reserved.
+        </div>
     </footer>
 
+    <!-- Refresh Warning Toast -->
+    <div id="refreshWarningToast" class="hidden">
+        <span id="warningMessage">Download in progress! Refreshing will interrupt your download.</span>
+        <span class="close-btn" onclick="window.hideRefreshWarning()">✕</span>
+    </div>
+
     <script src="renderer.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            const processingLog = document.getElementById('processingLog');
+            const directoryTree = document.getElementById('directoryTree');
+            const downloadStatus = document.getElementById('downloadStatus');
+            const downloadMessage = document.getElementById('downloadMessage');
+            const newDownloadBtnContainer = document.getElementById('newDownloadBtnContainer');
+            const newDownloadBtn = document.getElementById('newDownloadBtn');
+            const refreshWarningToast = document.getElementById('refreshWarningToast');
+
+            // Flag to track if download complete UI has been shown
+            let downloadCompleteShown = false;
+
+            // Function to show refresh warning toast
+            window.showRefreshWarning = function () {
+                refreshWarningToast.classList.remove('hidden');
+                setTimeout(() => {
+                    refreshWarningToast.classList.add('show');
+                }, 10);
+
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    hideRefreshWarning();
+                }, 5000);
+            };
+
+            // Function to hide refresh warning toast
+            window.hideRefreshWarning = function () {
+                refreshWarningToast.classList.remove('show');
+                setTimeout(() => {
+                    refreshWarningToast.classList.add('hidden');
+                }, 300);
+            };
+
+            // Make sure download status shows "Downloading media..." at the start
+            downloadStatus.textContent = "Downloading media...";
+            downloadMessage.textContent = "Relax, your download is in progress";
+
+            // Prevent page refresh during download
+            window.addEventListener('beforeunload', function (event) {
+                if (window.state && window.state.isDownloading && !window.state.isComplete) {
+                    // Show warning toast to user (will display if they cancel the browser dialogue)
+                    window.showRefreshWarning();
+
+                    // Cancel the event
+                    event.preventDefault();
+                    // Chrome requires returnValue to be set
+                    event.returnValue = 'Download in progress. Refreshing the page will interrupt your download.';
+                    return 'Download in progress. Refreshing the page will interrupt your download.';
+                }
+            });
+
+            // Also capture keydown events for F5, Ctrl+R, etc.
+            document.addEventListener('keydown', function (e) {
+                // Check for refresh key combinations: F5 or Ctrl+R
+                if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                    if (window.state && window.state.isDownloading && !window.state.isComplete) {
+                        e.preventDefault();
+                        window.showRefreshWarning();
+                    }
+                }
+            });
+
+            pauseBtn.addEventListener('click', function () {
+                // Add active class to pause button
+                pauseBtn.classList.add('active');
+                resumeBtn.classList.remove('active');
+
+                // Add log entry for pause
+                addLogEntry('Download paused by user.');
+            });
+
+            resumeBtn.addEventListener('click', function () {
+                // Add active class to resume button
+                resumeBtn.classList.add('active');
+                pauseBtn.classList.remove('active');
+
+                // Add log entry for resume
+                addLogEntry('Download resumed.');
+            });
+
+            // New Download button functionality
+            newDownloadBtn.addEventListener('click', function () {
+                // Reset everything and go back to OTP screen
+                // This will be handled by the existing resetUI and showOtpScreen functions in renderer.js
+            });
+
+            // Function to add log entries
+            function addLogEntry(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('p');
+                logEntry.className = 'text-sm text-gray-600';
+                logEntry.textContent = `[${timestamp}] ${message}`;
+
+                // Add to the top of the log
+                const logContainer = processingLog.querySelector('div:last-child');
+                logContainer.insertBefore(logEntry, logContainer.firstChild);
+
+                // Scroll to the newest entry
+                processingLog.scrollTop = 0;
+            }
+
+            // Example function to show download complete UI
+            window.showDownloadComplete = function () {
+                // Prevent multiple calls
+                if (downloadCompleteShown) return;
+                downloadCompleteShown = true;
+
+                // Add a success icon next to the header
+                const successIcon = document.createElement('span');
+                successIcon.className = "inline-flex text-green-600 mr-2";
+                successIcon.innerHTML = `
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                `;
+
+                // Update header text with completion message
+                downloadStatus.textContent = "";
+                downloadStatus.appendChild(successIcon);
+                downloadStatus.appendChild(document.createTextNode("Download Complete"));
+                downloadStatus.classList.add("text-green-600", "flex", "items-center", "justify-center");
+                downloadMessage.textContent = "Click below if you want to start new download";
+
+                // Simply hide the processing log and show the directory tree
+                if (processingLog) {
+                    processingLog.classList.add('hidden');
+                }
+
+                if (directoryTree) {
+                    directoryTree.classList.remove('hidden');
+                }
+
+                // Show the new download button with animation
+                newDownloadBtnContainer.classList.remove('hidden');
+                setTimeout(() => {
+                    newDownloadBtnContainer.classList.add('visible');
+                }, 50);
+
+                // Disable pause/resume buttons
+                pauseBtn.disabled = true;
+                resumeBtn.disabled = true;
+
+                // Add visual indication that buttons are disabled
+                pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                resumeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+                // Remove active states
+                pauseBtn.classList.remove('active');
+                resumeBtn.classList.remove('active');
+            };
+
+            // Add a function to reset the flag when starting a new download
+            window.resetDownloadCompleteFlag = function () {
+                downloadCompleteShown = false;
+            };
+        });
+    </script>
 </body>
 
 </html>
