@@ -72,69 +72,106 @@ process.on("uncaughtException", (error) => {
 });
 
 // Setup auto-updater events
-autoUpdater.on('checking-for-update', () => {
-  log.info('Checking for updates...');
+autoUpdater.on("checking-for-update", () => {
+  log.info("Checking for updates...");
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog.showMessageBox({
+      type: "info",
+      title: "Checking for Updates",
+      message: "Checking for application updates...",
+      buttons: ["OK"],
+      noLink: true,
+    });
+  }
 });
 
-autoUpdater.on('update-available', (info) => {
-  log.info('Update available:', info);
-  dialog.showMessageBox({
-    type: 'info',
-    title: 'Update Available',
-    message: 'A new version is available. Would you like to download and install it now?',
-    buttons: ['Yes', 'No'],
-    defaultId: 0
-  }).then(({ response }) => {
-    if (response === 0) {
-      autoUpdater.downloadUpdate();
-    }
-  });
+autoUpdater.on("update-available", (info) => {
+  log.info("Update available:", info);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Available",
+        message:
+          "A new version is available. Would you like to download and install it now?",
+        buttons: ["Yes", "No"],
+        defaultId: 0,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+  }
 });
 
-autoUpdater.on('update-not-available', (info) => {
-  log.info('Update not available:', info);
+autoUpdater.on("update-not-available", (info) => {
+  log.info("Update not available:", info);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog.showMessageBox({
+      type: "info",
+      title: "No Updates Available",
+      message: "You are using the latest version of the application.",
+      buttons: ["OK"],
+      noLink: true,
+    });
+  }
 });
 
-autoUpdater.on('error', (err) => {
-  log.error('Error in auto-updater:', err);
-  dialog.showErrorBox('Error', 'Failed to check for updates. Please try again later.');
+autoUpdater.on("error", (err) => {
+  log.error("Error in auto-updater:", err);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      "Error",
+      "Failed to check for updates. Please try again later."
+    );
+  }
 });
 
-autoUpdater.on('download-progress', (progressObj) => {
+autoUpdater.on("download-progress", (progressObj) => {
   let message = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
   log.info(message);
 });
 
-autoUpdater.on('update-downloaded', (info) => {
-  log.info('Update downloaded:', info);
-  dialog.showMessageBox({
-    type: 'info',
-    title: 'Update Ready',
-    message: 'Update has been downloaded. The application will restart to install the update.',
-    buttons: ['Restart'],
-    defaultId: 0
-  }).then(() => {
-    autoUpdater.quitAndInstall(false, true);
-  });
+autoUpdater.on("update-downloaded", (info) => {
+  log.info("Update downloaded:", info);
+  dialog
+    .showMessageBox({
+      type: "info",
+      title: "Update Ready",
+      message:
+        "Update has been downloaded. The application will restart to install the update.",
+      buttons: ["Restart"],
+      defaultId: 0,
+    })
+    .then(() => {
+      autoUpdater.quitAndInstall(false, true);
+    });
 });
 
 // Initialize the application
 try {
   const { initializeApp } = require("./js/main");
   initializeApp();
-  
-  // Check for updates after app is initialized
-  autoUpdater.checkForUpdates().catch(err => {
-    log.error('Error checking for updates:', err);
-  });
-  
-  // Check for updates every hour
-  setInterval(() => {
-    autoUpdater.checkForUpdates().catch(err => {
-      log.error('Error checking for updates:', err);
+
+  // Wait for app to be ready before checking for updates
+  app.whenReady().then(() => {
+    // Check for updates after app is ready
+    autoUpdater.checkForUpdates().catch((err) => {
+      log.error("Error checking for updates:", err);
     });
-  }, 60 * 60 * 1000);
-  
+
+    // Check for updates every hour
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        log.error("Error checking for updates:", err);
+      });
+    }, 60 * 60 * 1000);
+  });
 } catch (error) {
   log.error(`Failed to initialize application: ${error.message}`);
   log.error(error.stack);
