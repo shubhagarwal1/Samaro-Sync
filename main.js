@@ -1,21 +1,20 @@
-const { app, dialog, BrowserWindow, shell } = require("electron");
+const { app, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
-const axios = require("axios");
 
 // Configure logging
 log.transports.file.level = "info";
 
-// App version
-const appVersion = app.getVersion();
-
-// Configure auto-updater (currently disabled)
+// Configure auto-updater
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
+autoUpdater.autoDownload = false;
+autoUpdater.allowDowngrade = true;
+autoUpdater.allowPrerelease = true;
 log.info("Application starting...");
-log.info(`App version: ${appVersion}`);
+log.info(`App version: ${app.getVersion()}`);
 log.info(`App name: ${app.getName()}`);
 log.info(`App path: ${app.getAppPath()}`);
 log.info(`Executable path: ${process.execPath}`);
@@ -75,12 +74,11 @@ process.on("uncaughtException", (error) => {
   }
 });
 
-// Manual update checker function
-async function checkForUpdatesManually() {
-  try {
-    log.info("Manually checking for updates...");
-
-    // Show checking dialog
+// Setup auto-updater events
+autoUpdater.on("checking-for-update", () => {
+  log.info("Checking for updates...");
+  // Only show dialog if app is ready
+  if (app.isReady()) {
     dialog.showMessageBox({
       type: "info",
       title: "Checking for Updates",
@@ -88,67 +86,93 @@ async function checkForUpdatesManually() {
       buttons: ["OK"],
       noLink: true,
     });
+  }
+});
 
-    // Fetch the latest release info from GitHub
-    const response = await axios.get(
-      "https://api.github.com/repos/shubhagarwal1/Samaro-Sync/releases/latest"
-    );
-    const latestVersion = response.data.tag_name;
-    const downloadUrl = `https://github.com/shubhagarwal1/Samaro-Sync/releases/tag/${latestVersion}`;
-
-    log.info(
-      `Current version: ${appVersion}, Latest version: ${latestVersion}`
-    );
-
-    // Compare versions (simple string comparison for now)
-    if (latestVersion !== appVersion) {
-      const { response: buttonIndex } = await dialog.showMessageBox({
+autoUpdater.on("update-available", (info) => {
+  log.info("Update available:", info);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog
+      .showMessageBox({
         type: "info",
         title: "Update Available",
-        message: `A new version (${latestVersion}) is available. Would you like to download it now?`,
+        message:
+          "A new version is available. Would you like to download and install it now?",
         buttons: ["Yes", "No"],
         defaultId: 0,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          autoUpdater.downloadUpdate();
+        }
       });
+  }
+});
 
-      if (buttonIndex === 0) {
-        // Open browser to the release page
-        await shell.openExternal(downloadUrl);
-      }
-    } else {
-      dialog.showMessageBox({
-        type: "info",
-        title: "No Updates Available",
-        message: "You are using the latest version of the application.",
-        buttons: ["OK"],
-        noLink: true,
-      });
-    }
-  } catch (error) {
-    log.error(`Error checking for updates manually: ${error.message}`);
+autoUpdater.on("update-not-available", (info) => {
+  log.info("Update not available:", info);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
+    dialog.showMessageBox({
+      type: "info",
+      title: "No Updates Available",
+      message: "You are using the latest version of the application.",
+      buttons: ["OK"],
+      noLink: true,
+    });
+  }
+});
+
+autoUpdater.on("error", (err) => {
+  log.error("Error in auto-updater:", err);
+  // Only show dialog if app is ready
+  if (app.isReady()) {
     dialog.showErrorBox(
       "Error",
       "Failed to check for updates. Please try again later."
     );
   }
-}
+});
+
+autoUpdater.on("download-progress", (progressObj) => {
+  let message = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
+  log.info(message);
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  log.info("Update downloaded:", info);
+  dialog
+    .showMessageBox({
+      type: "info",
+      title: "Update Ready",
+      message:
+        "Update has been downloaded. The application will restart to install the update.",
+      buttons: ["Restart"],
+      defaultId: 0,
+    })
+    .then(() => {
+      // Force the update to install without asking for confirmation
+      // and quit the app after the update is installed
+      autoUpdater.quitAndInstall(true, true);
+    });
+});
 
 // Initialize the application
 try {
   const { initializeApp } = require("./js/main");
   initializeApp();
 
-  // Wait for app to be ready
+  // Wait for app to be ready before checking for updates
   app.whenReady().then(() => {
     // Check for updates after app is ready
-    setTimeout(() => {
-      checkForUpdatesManually().catch((err) => {
-        log.error("Error checking for updates:", err);
-      });
-    }, 5000); // Check after 5 seconds
+    autoUpdater.checkForUpdates().catch((err) => {
+      log.error("Error checking for updates:", err);
+    });
 
-    // Setup manual update check every hour
+    // Check for updates every hour
     setInterval(() => {
-      checkForUpdatesManually().catch((err) => {
+      autoUpdater.checkForUpdates().catch((err) => {
         log.error("Error checking for updates:", err);
       });
     }, 60 * 60 * 1000);
