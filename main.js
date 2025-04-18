@@ -1,4 +1,4 @@
-const { app, dialog } = require("electron");
+const { app, dialog, Menu } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const log = require("electron-log");
@@ -13,6 +13,8 @@ autoUpdater.logger.transports.file.level = "info";
 autoUpdater.autoDownload = false;
 autoUpdater.allowDowngrade = true;
 autoUpdater.allowPrerelease = true;
+autoUpdater.disableWebInstaller = true;
+autoUpdater.forceDevUpdateConfig = true;
 log.info("Application starting...");
 log.info(`App version: ${app.getVersion()}`);
 log.info(`App name: ${app.getName()}`);
@@ -165,6 +167,47 @@ try {
 
   // Wait for app to be ready before checking for updates
   app.whenReady().then(() => {
+    // Create a custom menu with a Check for Updates option
+    const template = [
+      {
+        label: "App",
+        submenu: [
+          {
+            label: "Check for Updates",
+            click: () => {
+              dialog
+                .showMessageBox({
+                  type: "info",
+                  title: "Checking for Updates",
+                  message: "Checking for application updates...",
+                  buttons: ["OK"],
+                })
+                .then(() => {
+                  autoUpdater.checkForUpdates().catch((err) => {
+                    log.error("Error checking for updates:", err);
+                  });
+                });
+            },
+          },
+          { role: "quit" },
+        ],
+      },
+      {
+        label: "Edit",
+        submenu: [
+          { role: "undo" },
+          { role: "redo" },
+          { type: "separator" },
+          { role: "cut" },
+          { role: "copy" },
+          { role: "paste" },
+        ],
+      },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+
     // Check for updates after app is ready
     autoUpdater.checkForUpdates().catch((err) => {
       log.error("Error checking for updates:", err);

@@ -36,7 +36,11 @@
   "build": {
     "appId": "com.samaro.sync",
     "productName": "Samaro-Sync",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/electron-log",
+      "SamaroSync.bat"
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
