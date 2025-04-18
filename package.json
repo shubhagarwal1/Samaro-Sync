@@ -35,7 +35,7 @@
   "description": "Fast and hassle-free downloads",
   "build": {
     "appId": "com.samaro.sync",
-    "productName": "Samaro Sync",
+    "productName": "Samaro-Sync",
     "asar": false,
     "directories": {
       "output": "dist",
